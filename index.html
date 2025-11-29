@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PBST 2025</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap');
+
+        :root {
+            --ct-blue: #00f3ff;
+            --fr-orange: #ff5e00;
+            --ban-red: #ff003c;
+            --pick-gold: #ffd700;
+            --bg-deep: #050508;
+            --glass: rgba(255, 255, 255, 0.05);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+
+        body {
+            background-color: var(--bg-deep);
+            color: white;
+            font-family: 'Rajdhani', sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            display: flex; flex-direction: column;
+            perspective: 1200px;
+        }
+
+        /* --- VFX --- */
+        .vfx-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none;
+            background: radial-gradient(circle at 50% 0%, #1a1a25 0%, #000 90%);
+        }
+        .grid-floor {
+            position: absolute; bottom: -30%; left: -50%; width: 200%; height: 100%;
+            background-image: linear-gradient(rgba(0, 243, 255, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 243, 255, 0.1) 1px, transparent 1px);
+            background-size: 60px 60px;
+            transform: rotateX(60deg);
+            animation: gridFlow 10s linear infinite;
+            mask-image: linear-gradient(to top, black 10%, transparent 60%);
+        }
+
+        /* --- PHASE 1: LOBBY & COIN FLIP --- */
+        #intro-layer {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(5, 5, 8, 0.98); z-index: 9999;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: opacity 0.8s;
+        }
+        #intro-layer.hidden { opacity: 0; pointer-events: none; }
+
+        .phase-container {
+            width: 800px; display: flex; flex-direction: column; align-items: center; gap: 40px;
+            transition: 0.5s;
+        }
+        .phase-container.hidden { display: none; }
+
+        .intro-title { font-family: 'Orbitron'; font-size: 2.5rem; letter-spacing: 5px; color: #fff; text-shadow: 0 0 20px rgba(255,255,255,0.3); }
+
+        .team-inputs-row { display: flex; width: 100%; justify-content: space-between; align-items: center; }
+        .input-wrapper { display: flex; flex-direction: column; gap: 10px; width: 300px; }
+        .input-wrapper label { font-family: 'Orbitron'; color: #666; font-size: 0.8rem; }
+        .team-input {
+            background: transparent; border: none; border-bottom: 2px solid #444;
+            color: white; font-size: 2rem; font-family: 'Rajdhani'; font-weight: bold; text-align: center;
+            padding: 10px; transition: 0.3s;
+        }
+        .team-input:focus { border-color: white; outline: none; }
+
+        /* Digital RNG Decryptor Style */
+        .rng-decryptor {
+            width: 120px; height: 120px; border: 2px solid #333;
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'Orbitron'; font-size: 3rem; font-weight: 900; color: #333;
+            position: relative; overflow: hidden;
+        }
+        .rng-decryptor::before {
+            content: ''; position: absolute; top:0; left:0; width:100%; height:100%;
+            background: repeating-linear-gradient(0deg, transparent 0px, transparent 2px, rgba(0,0,0,0.5) 3px);
+            pointer-events: none;
+        }
+        .rng-decryptor.active { border-color: white; color: white; text-shadow: 0 0 20px white; box-shadow: 0 0 30px rgba(255,255,255,0.2); }
+
+        .action-btn {
+            padding: 15px 50px; background: white; color: black; border: none;
+            font-family: 'Orbitron'; font-weight: bold; font-size: 1.1rem; cursor: pointer;
+            clip-path: polygon(15px 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%, 0 15px);
+            transition: 0.3s;
+        }
+        .action-btn:hover { transform: scale(1.05); box-shadow: 0 0 30px white; }
+
+
+        /* --- PHASE 2: SIDE SELECTION --- */
+        .side-select-title { font-family: 'Orbitron'; font-size: 1.5rem; color: #888; text-align: center; margin-bottom: 30px; }
+        .winner-name-display { font-size: 3rem; font-weight: bold; color: white; margin-bottom: 40px; text-shadow: 0 0 30px white; }
+        
+        .sides-row { display: flex; gap: 40px; }
+        .side-card {
+            width: 300px; height: 400px; border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.02); display: flex; flex-direction: column; align-items: center; justify-content: center;
+            cursor: pointer; transition: 0.3s; position: relative; overflow: hidden;
+        }
+        .side-card h2 { font-family: 'Orbitron'; font-size: 3rem; margin-bottom: 10px; z-index: 2; }
+        .side-card p { font-family: 'Orbitron'; z-index: 2; letter-spacing: 2px; }
+        
+        .side-card.ct:hover { border-color: var(--ct-blue); box-shadow: 0 0 50px var(--ct-blue); background: rgba(0, 243, 255, 0.1); }
+        .side-card.ct h2 { color: var(--ct-blue); }
+        
+        .side-card.fr:hover { border-color: var(--fr-orange); box-shadow: 0 0 50px var(--fr-orange); background: rgba(255, 94, 0, 0.1); }
+        .side-card.fr h2 { color: var(--fr-orange); }
+
+
+        /* --- PHASE 3: MAIN DASHBOARD (Restored High-End) --- */
+        header { z-index: 10; display: flex; justify-content: space-between; align-items: center; padding: 20px 50px; background: linear-gradient(180deg, rgba(0,0,0,0.9) 0%, transparent 100%); }
+        h1 { font-family: 'Orbitron'; letter-spacing: 3px; font-style: italic; text-shadow: 0 0 20px var(--ct-blue); }
+
+        .format-selector { display: flex; gap: 5px; }
+        .format-btn { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #888; padding: 8px 30px; font-family: 'Orbitron'; cursor: pointer; transition: 0.3s; clip-path: polygon(10px 0, 100% 0, 100% 100%, 0 100%); }
+        .format-btn.active { background: var(--ct-blue); color: black; border-color: var(--ct-blue); font-weight: bold; box-shadow: 0 0 20px var(--ct-blue); }
+
+        .dashboard { position: relative; z-index: 5; display: flex; justify-content: space-between; padding: 10px 50px; height: 78vh; }
+
+        .team-panel {
+            width: 280px; height: 100%; background: rgba(10, 15, 20, 0.6); backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; align-items: center; padding-top: 40px;
+            transition: 0.4s; position: relative;
+        }
+        .team-panel.active-turn { background: rgba(20, 30, 40, 0.7); box-shadow: 0 0 50px rgba(0,0,0,0.5); border-top: 2px solid white; }
+        .team-a.active-turn { border-top-color: var(--ct-blue); box-shadow: 0 0 30px rgba(0, 243, 255, 0.2); }
+        .team-b.active-turn { border-top-color: var(--fr-orange); box-shadow: 0 0 30px rgba(255, 94, 0, 0.2); }
+
+        .team-logo { font-size: 4rem; font-weight: 900; font-family: 'Orbitron'; margin-bottom: 20px; filter: drop-shadow(0 0 15px rgba(0,0,0,0.8)); }
+        .team-a .team-logo { color: var(--ct-blue); }
+        .team-b .team-logo { color: var(--fr-orange); }
+        .team-name { font-size: 1.8rem; font-weight: 700; font-family: 'Orbitron'; text-transform: uppercase; text-align: center; }
+        .team-side { font-size: 0.8rem; color: #666; margin-top: 5px; font-family: 'Orbitron'; letter-spacing: 2px; }
+        .team-status { margin-top: 20px; font-size: 1rem; color: #888; letter-spacing: 1px; }
+
+        .center-area { flex-grow: 1; display: flex; flex-direction: column; align-items: center; padding: 0 30px; }
+
+        .map-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; width: 100%; max-width: 1000px; }
+        .map-card { height: 160px; background: #0a0a0e; border: 1px solid #333; position: relative; overflow: hidden; cursor: pointer; transition: 0.3s; clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); }
+        .map-img { width: 100%; height: 100%; background-size: cover; background-position: center; filter: grayscale(1) brightness(0.5); transition: 0.4s; }
+        .map-name { position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(0deg, black, transparent); padding: 8px; text-align: center; font-family: 'Orbitron'; font-weight: bold; font-size: 0.8rem; z-index: 2; }
+        .map-card:hover:not(.disabled) { transform: translateY(-8px) scale(1.05); border-color: white; z-index: 10; box-shadow: 0 10px 50px black; }
+        .map-card:hover:not(.disabled) .map-img { filter: grayscale(0) brightness(1.2); }
+
+        .map-card.banned .map-img { filter: grayscale(1) brightness(0.1) blur(4px); }
+        .map-card.banned::after { content: "YASAKLANDI"; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-20deg) scale(3); border: 3px solid var(--ban-red); color: var(--ban-red); font-size: 1.2rem; font-weight: 900; padding: 5px 20px; opacity: 0; animation: slam 0.3s forwards; background: rgba(0,0,0,0.9); box-shadow: 0 0 30px var(--ban-red); }
+        .map-card.picked { border-color: var(--pick-gold); box-shadow: 0 0 30px rgba(255, 215, 0, 0.1); }
+        .map-card.picked .map-img { filter: sepia(0.5) brightness(1); }
+        .map-card.picked::after { content: "SEÇİLDİ"; position: absolute; bottom: 50%; left: 50%; transform: translate(-50%, 50%); background: var(--pick-gold); color: black; font-weight: 900; padding: 5px 15px; font-family: 'Orbitron'; animation: slideUp 0.4s forwards; }
+        .map-card.rng-active { border: 2px solid white; transform: scale(1.1); z-index: 20; box-shadow: 0 0 60px white; }
+        .map-card.rng-active .map-img { filter: grayscale(0) brightness(1.5); }
+        .map-card.decider { border: 2px solid var(--ct-blue); box-shadow: 0 0 50px var(--ct-blue); z-index: 15; transform: scale(1.1); }
+        .map-card.decider::after { content: "DECIDER"; position: absolute; top: 10px; left: 0; width: 100%; text-align: center; color: var(--ct-blue); font-weight: bold; text-shadow: 0 0 15px var(--ct-blue); animation: blink 1s infinite; }
+
+        .queue-bar { display: flex; gap: 15px; margin-top: 40px; width: 100%; justify-content: center; }
+        .q-slot { width: 140px; height: 90px; background: rgba(255,255,255,0.02); border: 1px dashed #333; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: 0.3s; clip-path: polygon(10px 0, 100% 0, 100% 100%, 0 100%); }
+        .q-slot .label { font-size: 0.7rem; color: #444; font-family: 'Orbitron'; margin-bottom: 5px; }
+        .q-slot .val { font-size: 0.9rem; font-weight: bold; color: #fff; text-align: center; display: none; }
+        .q-slot .who { font-size: 0.6rem; color: #888; margin-top: 3px; display: none; }
+        .q-slot.filled { border-style: solid; background: #0d0d12; animation: slideUp 0.3s ease forwards; }
+        .q-slot.filled .val, .q-slot.filled .who { display: block; }
+        .q-slot.filled.a { border-color: var(--ct-blue); box-shadow: 0 0 15px rgba(0, 243, 255, 0.1); }
+        .q-slot.filled.a .who { color: var(--ct-blue); }
+        .q-slot.filled.b { border-color: var(--fr-orange); box-shadow: 0 0 15px rgba(255, 94, 0, 0.1); }
+        .q-slot.filled.b .who { color: var(--fr-orange); }
+        .q-slot.filled.d { border-color: var(--pick-gold); box-shadow: 0 0 25px rgba(255, 215, 0, 0.15); }
+        .q-slot.filled.d .who { color: var(--pick-gold); }
+
+        .timeline { position: absolute; bottom: 0; width: 100%; height: 80px; background: linear-gradient(0deg, #000 0%, transparent 100%); display: flex; justify-content: center; align-items: center; gap: 20px; z-index: 10; }
+        .t-step { width: 30px; height: 30px; border-radius: 50%; background: #111; border: 2px solid #333; display: flex; align-items: center; justify-content: center; font-family: 'Orbitron'; font-size: 0.7rem; color: #555; transition: 0.3s; }
+        .t-step.active { transform: scale(1.4); border-color: white; color: white; background: #222; box-shadow: 0 0 15px white; }
+        .t-step.past { opacity: 0.5; background: #000; }
+
+        @keyframes gridFlow { 0% { background-position-y: 0; } 100% { background-position-y: 60px; } }
+        @keyframes slam { 0% { transform: translate(-50%, -50%) scale(3) rotate(-20deg); opacity: 0; } 100% { transform: translate(-50%, -50%) scale(1) rotate(-20deg); opacity: 1; } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes blink { 50% { opacity: 0.5; } }
+    </style>
+</head>
+<body>
+
+    <div class="vfx-layer"><div class="grid-floor"></div></div>
+
+    <div id="intro-layer">
+        
+        <div class="phase-container" id="phase-1">
+            <div class="intro-title">PBST LOBBY</div>
+            
+            <div class="team-inputs-row">
+                <div class="input-wrapper">
+                    <label>TAKIM A</label>
+                    <input type="text" id="input-team-1" class="team-input" value="TAKIM A">
+                </div>
+
+                <div class="rng-decryptor" id="rng-box">?</div>
+
+                <div class="input-wrapper">
+                    <label>TAKIM B</label>
+                    <input type="text" id="input-team-2" class="team-input" value="TAKIM B">
+                </div>
+            </div>
+
+            <button class="action-btn" onclick="startRNG()">KURA ÇEK</button>
+        </div>
+
+        <div class="phase-container hidden" id="phase-2">
+            <div class="intro-title">KURA KAZANANI</div>
+            <div class="winner-name-display" id="winner-display">---</div>
+            <div class="side-select-title">TARAF SEÇİMİ YAPIN</div>
+            
+            <div class="sides-row">
+                <div class="side-card ct" onclick="selectSide('CT')">
+                    <h2>CT</h2>
+                    <p>CT-FORCE (MAVİ)</p>
+                </div>
+                <div class="side-card fr" onclick="selectSide('FR')">
+                    <h2>FR</h2>
+                    <p>FREE REBELS (TURUNCU)</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+
+    <header>
+        <h1>PBST<span style="color:var(--ct-blue)">2025</span></h1>
+        <div class="format-selector">
+            <button class="format-btn" onclick="setFormat('BO1')">BO1</button>
+            <button class="format-btn active" onclick="setFormat('BO3')">BO3</button>
+            <button class="format-btn" onclick="setFormat('BO5')">BO5</button>
+        </div>
+    </header>
+
+    <div class="dashboard">
+        <div class="team-panel team-a" id="p-a">
+            <div class="team-logo">CT</div>
+            <div class="team-name" id="name-blue">---</div>
+            <div class="team-side">MAVİ TAKIM</div>
+            <div class="team-status" id="s-a">BEKLİYOR</div>
+        </div>
+
+        <div class="center-area">
+            <div class="map-grid" id="grid"></div>
+            <div class="queue-bar" id="queue"></div>
+        </div>
+
+        <div class="team-panel team-b" id="p-b">
+            <div class="team-logo">FR</div>
+            <div class="team-name" id="name-red">---</div>
+            <div class="team-side">KIRMIZI TAKIM</div>
+            <div class="team-status" id="s-b">BEKLİYOR</div>
+        </div>
+    </div>
+
+    <div class="timeline" id="timeline"></div>
+
+    <script>
+        // GLOBAL VARS
+        let team1Name = "";
+        let team2Name = "";
+        let winnerTeam = ""; // 1 or 2
+        let loserTeam = "";
+
+        // --- PHASE 1: RNG LOGIC ---
+        function startRNG() {
+            const btn = document.querySelector('.action-btn');
+            const box = document.getElementById('rng-box');
+            team1Name = document.getElementById('input-team-1').value.toUpperCase();
+            team2Name = document.getElementById('input-team-2').value.toUpperCase();
+
+            btn.disabled = true;
+            btn.style.opacity = 0.5;
+
+            let count = 0;
+            let speed = 50;
+            let max = 30; // Animasyon uzunluğu
+
+            function cycle() {
+                box.innerText = count % 2 === 0 ? "A" : "B";
+                box.classList.add('active');
+                
+                count++;
+                if (count < max) {
+                    if (count > 20) speed += 30;
+                    setTimeout(cycle, speed);
+                } else {
+                    // GERÇEK RASTGELE SONUÇ
+                    const rand = Math.random();
+                    const result = rand < 0.5 ? 1 : 2; // 1 = Team A wins, 2 = Team B wins
+                    
+                    box.innerText = result === 1 ? "A" : "B";
+                    
+                    // State Update
+                    winnerTeam = result === 1 ? team1Name : team2Name;
+                    loserTeam = result === 1 ? team2Name : team1Name;
+
+                    setTimeout(() => {
+                        goToPhase2();
+                    }, 1000);
+                }
+            }
+            cycle();
+        }
+
+        function goToPhase2() {
+            document.getElementById('phase-1').classList.add('hidden');
+            document.getElementById('phase-2').classList.remove('hidden');
+            document.getElementById('winner-display').innerText = winnerTeam;
+        }
+
+        function selectSide(side) {
+            // side 'CT' or 'FR'
+            let blueName = "";
+            let redName = "";
+
+            if (side === 'CT') {
+                blueName = winnerTeam;
+                redName = loserTeam;
+            } else {
+                blueName = loserTeam;
+                redName = winnerTeam;
+            }
+
+            // Init Game
+            document.getElementById('name-blue').innerText = blueName;
+            document.getElementById('name-red').innerText = redName;
+
+            // Fade out intro
+            document.getElementById('intro-layer').classList.add('hidden');
+            
+            // Start Veto Logic
+            setFormat('BO3');
+        }
+
+
+        // --- VETO SYSTEM LOGIC (Standard) ---
+        const maps = [
+            { name: "Luxville", img: "https://cdn2.pointblank.id/Web/upload/image/mapInfo/20240213/0738010673.jpg" },
+            { name: "Downtown", img: "https://cdn2.pointblank.id/Web/upload/image/mapInfo/20240208/13503905858.jpg" },
+            { name: "Secret Mansion", img: "https://cdn2.pointblank.id/Web/upload/image/mapInfo/20240426/082936153257.jpg" },
+            { name: "Blowcity", img: "https://cdn2.pointblank.id/Web/upload/image/mapInfo/20240213/073934023310.jpg" },
+            { name: "Stormtube", img: "https://cdn2.pointblank.id/Web/upload/image/mapInfo/20240213/074051578217.jpg" },
+            { name: "Sandstorm", img: "https://cdn2.pointblank.id/Web/upload/image/mapInfo/20240213/075511566625.jpg" },
+            { name: "Provence", img: "https://cdn2.pointblank.id/Web/upload/image/mapInfo/20240213/114134364849.jpg" },
+            { name: "Safe House", img: "https://cdn2.pointblank.id/Web/upload/image/mapInfo/20240213/091922700589.jpg" },
+            { name: "Villa", img: "https://pb.tamgame.com/upload/image/20250701/35988dbc92ace7c192596eae15043552.png" },
+            { name: "Midtown",  img: "https://cdn2.pointblank.id/Web/upload/image/mapInfo/20240213/090951429198.jpg" }
+        ];
+
+        const sequences = {
+            BO1: [{t:'BAN',w:'A'},{t:'BAN',w:'B'},{t:'BAN',w:'A'},{t:'BAN',w:'B'},{t:'BAN',w:'A'},{t:'BAN',w:'B'},{t:'BAN',w:'A'},{t:'BAN',w:'B'},{t:'DECIDER',w:'RNG'}],
+            BO3: [{t:'BAN',w:'A'},{t:'BAN',w:'B'},{t:'PICK',w:'A'},{t:'PICK',w:'B'},{t:'BAN',w:'A'},{t:'BAN',w:'B'},{t:'BAN',w:'A'},{t:'BAN',w:'B'},{t:'DECIDER',w:'RNG'}],
+            BO5: [{t:'BAN',w:'A'},{t:'BAN',w:'B'},{t:'PICK',w:'A'},{t:'PICK',w:'B'},{t:'PICK',w:'A'},{t:'PICK',w:'B'},{t:'BAN',w:'A'},{t:'BAN',w:'B'},{t:'DECIDER',w:'RNG'}]
+        };
+
+        let currentSeq = [];
+        let stepIdx = 0;
+        let activeMaps = [];
+        let qIndex = 0;
+        let isSpinning = false;
+
+        function setFormat(fmt) {
+            currentSeq = sequences[fmt];
+            stepIdx = 0;
+            qIndex = 0;
+            activeMaps = maps.map(m => m.name);
+            isSpinning = false;
+            document.querySelectorAll('.format-btn').forEach(b => b.classList.toggle('active', b.innerText === fmt));
+            renderGrid();
+            renderQueue(fmt);
+            renderTimeline();
+            updateState();
+        }
+
+        function renderGrid() {
+            const c = document.getElementById('grid'); c.innerHTML = '';
+            maps.forEach(m => {
+                const el = document.createElement('div'); el.className = 'map-card'; el.dataset.name = m.name;
+                el.onclick = () => onMapClick(m.name, el);
+                el.innerHTML = `<div class="map-img" style="background-image: url('${m.img}')"></div><div class="map-name">${m.name}</div>`;
+                c.appendChild(el);
+            });
+        }
+        function renderQueue(fmt) {
+            const c = document.getElementById('queue'); c.innerHTML = '';
+            const cnt = fmt === 'BO1' ? 1 : (fmt === 'BO3' ? 3 : 5);
+            for(let i=0; i<cnt; i++) {
+                const el = document.createElement('div'); el.className = 'q-slot'; el.id = `q-${i}`;
+                el.innerHTML = `<div class="label">MAP ${i+1}</div><div class="val">?</div><div class="who">-</div>`;
+                c.appendChild(el);
+            }
+        }
+        function renderTimeline() {
+            const c = document.getElementById('timeline'); c.innerHTML = '';
+            currentSeq.forEach((s, i) => {
+                const el = document.createElement('div'); el.className = 't-step'; el.id = `t-${i}`;
+                el.innerText = s.w === 'RNG' ? '?' : s.w;
+                let col = '#555'; if(s.w==='A') col='var(--ct-blue)'; if(s.w==='B') col='var(--fr-orange)'; if(s.t==='DECIDER') col='var(--pick-gold)';
+                el.style.borderColor = col; el.style.color = col; c.appendChild(el);
+            });
+        }
+        function updateState() {
+            document.getElementById('p-a').classList.remove('active-turn'); document.getElementById('p-b').classList.remove('active-turn');
+            document.getElementById('s-a').innerText = "BEKLİYOR"; document.getElementById('s-b').innerText = "BEKLİYOR";
+            currentSeq.forEach((_, i) => { const el = document.getElementById(`t-${i}`); el.classList.remove('active','past'); if(i<stepIdx) el.classList.add('past'); if(i===stepIdx) el.classList.add('active'); });
+            
+            if(stepIdx >= currentSeq.length) return;
+            const step = currentSeq[stepIdx];
+            
+            if(step.t === 'DECIDER') { if(activeMaps.length === 2 && !isSpinning) runRoulette(); return; }
+            
+            const p = step.w === 'A' ? 'p-a' : 'p-b'; const s = step.w === 'A' ? 's-a' : 's-b'; const col = step.w === 'A' ? 'var(--ct-blue)' : 'var(--fr-orange)';
+            document.getElementById(p).classList.add('active-turn'); document.getElementById(s).innerText = step.t === 'BAN' ? 'YASAKLIYOR...' : 'SEÇİYOR...'; document.getElementById(s).style.color = col;
+        }
+        function onMapClick(name, el) {
+            if(isSpinning || stepIdx >= currentSeq.length) return;
+            if(el.classList.contains('banned') || el.classList.contains('picked')) return;
+            if(currentSeq[stepIdx].t === 'DECIDER') return;
+            const step = currentSeq[stepIdx];
+            if(step.t === 'BAN') { el.classList.add('banned'); } else { el.classList.add('picked'); el.style.borderColor = step.w==='A'?'var(--ct-blue)':'var(--fr-orange)'; fillQueue(name,step.w,'PICK'); }
+            activeMaps = activeMaps.filter(m => m !== name); stepIdx++; updateState();
+        }
+        function fillQueue(name, w, type) {
+            const slot = document.getElementById(`q-${qIndex}`); if(!slot) return;
+            slot.querySelector('.val').innerText = name; const who = slot.querySelector('.who');
+            slot.classList.remove('a','b','d');
+            if(type === 'DECIDER') { slot.classList.add('filled','d'); who.innerText="RNG DECIDER"; }
+            else { slot.classList.add('filled', w==='A'?'a':'b'); who.innerText = w==='A' ? document.getElementById('name-blue').innerText : document.getElementById('name-red').innerText; }
+            qIndex++;
+        }
+        function runRoulette() {
+            isSpinning = true; document.getElementById('s-a').innerText="RNG..."; document.getElementById('s-b').innerText="RNG...";
+            const cards = activeMaps.map(n => document.querySelector(`.map-card[data-name="${n}"]`));
+            let c=0; let spd=60; let max=30;
+            function spin() {
+                cards.forEach(x => x.classList.remove('rng-active')); cards[c%2].classList.add('rng-active'); c++;
+                if(c<max) { if(c>20) spd+=20; setTimeout(spin, spd); } else {
+                    const winI = Math.random() < 0.5 ? 0 : 1;
+                    const winCard = cards[winI]; const loseCard = cards[winI===0?1:0];
+                    document.querySelectorAll('.map-card').forEach(x => x.classList.remove('rng-active'));
+                    loseCard.classList.add('banned'); winCard.classList.add('decider'); fillQueue(winCard.dataset.name, null, 'DECIDER');
+                    document.getElementById('s-a').innerText="TAMAMLANDI"; document.getElementById('s-b').innerText="TAMAMLANDI"; isSpinning=false;
+                }
+            }
+            spin();
+        }
+    </script>
+</body>
+</html>
